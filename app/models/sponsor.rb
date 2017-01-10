@@ -47,9 +47,13 @@ class Sponsor < ActiveRecord::Base
   belongs_to :organization
   belongs_to :status
   belongs_to :sponsor_type
+  has_one :cashbox, as: :cashboxable, dependent: :destroy
   has_many :sponsorships
   has_many :orphans, through: :sponsorships
   belongs_to :agent, :class_name => 'User', :foreign_key => 'agent_id'
+
+  delegate :name, to: :status, prefix: true
+  delegate :name, to: :sponsor_type, prefix: true
 
   acts_as_sequenced scope: [:organization_id, :branch_id]
 
@@ -70,8 +74,19 @@ class Sponsor < ActiveRecord::Base
     pluck(:city).uniq
   end
 
-  scope :all_active, -> { joins(:status).where(statuses: { name: ['Active', 'On Hold'] } ) }
-  scope :all_inactive, -> { joins(:status).where(statuses: { name: 'Inactive' } ) }
+  def self.to_csv(records = [])
+    attributes = %w(osra_num name status start_date request_fulfilled sponsor_type country)
+    CSV.generate(headers: true) do |csv|
+      csv << attributes.map(&:titleize)
+      records.each do |sponsor|
+        row = [sponsor.osra_num, sponsor.name, sponsor.status.name, sponsor.start_date, sponsor.send(:request_fulfilled_description), sponsor.sponsor_type.name, en_ar_country(sponsor.country) ]
+        csv << row
+      end
+    end
+  end
+
+  scope :all_active, -> { joins(:status).where(statuses: { name: ['Active', 'On Hold'] } ).order(created_at: :desc) }
+  scope :all_inactive, -> { joins(:status).where(statuses: { name: 'Inactive' } ).order(created_at: :desc) }
 
 private
 
@@ -140,5 +155,15 @@ private
       self.city = new_city_name
     end
   end
+
+  def request_fulfilled_description
+    if request_fulfilled
+      res = 'Yes'
+    else
+      res = 'No'
+    end
+    "#{res} (#{active_sponsorship_count}/#{requested_orphan_count})"
+  end
+
 
 end

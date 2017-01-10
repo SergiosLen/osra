@@ -19,6 +19,7 @@ class Sponsorship < ActiveRecord::Base
   validate :sponsor_is_eligible_for_new_sponsorship, on: :create
   validate :orphan_is_eligible_for_new_sponsorship, on: :create
 
+  has_one :cashbox, as: :cashboxable, dependent: :destroy
   belongs_to :sponsor
   belongs_to :orphan
 
@@ -27,8 +28,6 @@ class Sponsorship < ActiveRecord::Base
 
   scope :all_active, -> { where(active: true) }
   scope :all_inactive, -> { where(active: false) }
-
-  default_scope { includes(:sponsor, :orphan) }
 
 private
 
